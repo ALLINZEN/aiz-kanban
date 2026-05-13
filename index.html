@@ -478,23 +478,21 @@ async function pushToGAS() {
   if (!GAS_URL) return;
   setSyncBadge('loading', 'กำลัง Sync...');
   try {
-    // แบ่งข้อมูลเป็น chunks แล้วส่งผ่าน GET ทีละ chunk
     const CHUNK = 10;
-    const total = Math.ceil(jobs.length / CHUNK);
-    // ส่ง chunk แรกพร้อม reset=true
     for (let i = 0; i < jobs.length; i += CHUNK) {
       const chunk = jobs.slice(i, i + CHUNK);
       const isFirst = i === 0;
-      const params = {
+      const data = await gasRequest(GAS_URL, {
         action: 'saveChunk',
         chunk: JSON.stringify(chunk),
         reset: isFirst ? '1' : '0',
         total: String(jobs.length)
-      };
-      const qs = Object.entries(params).map(([k,v]) => k + '=' + encodeURIComponent(v)).join('&');
-      const r = await fetch(GAS_URL + '?' + qs);
-      const data = await r.json();
+      });
       if (!data.ok) throw new Error('chunk failed');
+    }
+    // ถ้า jobs ว่าง ส่ง reset เปล่าเพื่อล้าง Sheet
+    if (jobs.length === 0) {
+      await gasRequest(GAS_URL, { action: 'saveChunk', chunk: '[]', reset: '1', total: '0' });
     }
     setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
   } catch (e) {
