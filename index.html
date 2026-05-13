@@ -398,129 +398,70 @@ function saveGasUrl() {
   setSyncBadge('ok', 'บันทึก URL แล้ว — กรุณา Import backup');
 }
 
-async function gasRequest(url, params) {
-  // ใช้ iframe trick เพื่อหลีกเลี่ยง CORS redirect ของ Google
-  const cbName = '_cb_' + Date.now();
-  const allParams = { ...params, callback: cbName };
-  const qs = Object.entries(allParams).map(([k,v]) => k + '=' + encodeURIComponent(v)).join('&');
-  
+async // ══════════════════════════════════════════
+//  GOOGLE SHEETS API CONFIG
+// ══════════════════════════════════════════
+const SHEET_ID = '1n8x-c-mblv4Bhb4Fg6abfI_SZABKeDRDnoTXPQNOYdM';
+const API_KEY  = 'AIzaSyCNM-6NH7lFK1C54ql0yXaNf0u9XsYBB74';
+const JOBS_RANGE = 'jobs!A1:A1000';
+const SUMMARY_SHEET = 'summary';
+
+async function sheetsRead() {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(JOBS_RANGE)}?key=${API_KEY}`;
+  const r = await fetch(url);
+  const data = await r.json();
+  if (!data.values) return [];
+  return data.values.slice(1) // skip header
+    .map(row => { try { return JSON.parse(row[0]); } catch(e) { return null; } })
+    .filter(Boolean);
+}
+
+async function sheetsWrite(jobs) {
+  // ต้องใช้ OAuth token ในการ write — ใช้ Apps Script แทน
+  // เรียก Apps Script สำหรับ write เท่านั้น
+  if (!GAS_URL) throw new Error('no GAS_URL');
+  const data = encodeURIComponent(JSON.stringify(jobs));
+  const url = `${GAS_URL}?action=saveAll&data=${data}&callback=_gasWrite_${Date.now()}`;
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      delete window[cbName];
-      reject(new Error('timeout'));
-    }, 15000);
-    
-    window[cbName] = (data) => {
-      clearTimeout(timeout);
-      delete window[cbName];
-      resolve(data);
-    };
-    
+    const cbName = '_gasWrite_' + Date.now();
+    const t = setTimeout(() => { delete window[cbName]; reject(new Error('timeout')); }, 30000);
+    window[cbName] = d => { clearTimeout(t); delete window[cbName]; resolve(d); };
     const s = document.createElement('script');
-    s.src = url + '?' + qs;
-    s.onerror = () => {
-      clearTimeout(timeout);
-      delete window[cbName];
-      reject(new Error('load error'));
-    };
+    s.src = GAS_URL + '?action=saveAll&data=' + encodeURIComponent(JSON.stringify(jobs)) + '&callback=' + cbName;
+    s.onerror = () => { clearTimeout(t); delete window[cbName]; reject(new Error('error')); };
     document.body.appendChild(s);
-    // ลบ script tag หลังโหลด
     s.onload = () => { if(s.parentNode) s.parentNode.removeChild(s); };
   });
 }
 
-async function testConnection() {
-  const url = document.getElementById('gas-url-input').value.trim();
-  if (!url) { alert('ใส่ URL ก่อนทดสอบ'); return; }
-  const res = document.getElementById('gas-test-result');
-  res.textContent = '⏳ กำลังทดสอบ...';
-  res.style.color = '#92400e';
-  try {
-    const data = await gasRequest(url, { action: 'getAll' });
-    if (Array.isArray(data)) {
-      res.textContent = '✅ เชื่อมต่อสำเร็จ! (' + data.length + ' รายการ)';
-      res.style.color = '#14532d';
-    } else {
-      res.textContent = '⚠ ตอบกลับแต่ format ไม่ถูกต้อง';
-      res.style.color = '#b45309';
-    }
-  } catch (e) {
-    res.textContent = '❌ เชื่อมต่อไม่ได้ — ตรวจสอบ URL และ Deploy อีกครั้ง';
-    res.style.color = '#991b1b';
-  }
-}
-
-// ══════════════════════════════════════════
-//  SYNC BADGE
-// ══════════════════════════════════════════
-function setSyncBadge(state, text) {
-  const el = document.getElementById('sync-badge');
-  el.className = 'sync-badge sync-' + state;
-  el.innerHTML = state === 'loading'
-    ? '<span class="sync-dot"></span>' + text
-    : (state === 'ok' ? '✓ ' : '⚠ ') + text;
-}
-
-// ══════════════════════════════════════════
-//  LOAD FROM GAS
-// ══════════════════════════════════════════
 async function loadFromGAS() {
-  if (!GAS_URL) {
-    loadLocal();
-    setSyncBadge('err', 'ยังไม่ได้ตั้งค่า URL');
-    render();
-    return;
-  }
   setSyncBadge('loading', 'กำลังโหลด...');
   try {
-    const data = await gasRequest(GAS_URL, { action: 'getAll' });
-    if (Array.isArray(data)) {
-      // ถ้า Sheet ว่างแต่เครื่องมีข้อมูล ไม่ทับ
-      if (data.length === 0 && jobs.length > 0) {
-        setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
-      } else {
-        jobs = data;
-        saveLocal();
-        setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
-      }
-    } else throw new Error('bad response');
-  } catch (e) {
+    const data = await sheetsRead();
+    if (Array.isArray(data) && data.length > 0) {
+      jobs = data;
+      saveLocal();
+      setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
+    } else {
+      loadLocal();
+      setSyncBadge('ok', 'โหลดจากเครื่อง ' + fmtTime());
+    }
+  } catch(e) {
     loadLocal();
     setSyncBadge('err', 'โหลดไม่ได้ ใช้ข้อมูลเครื่องแทน');
   }
   render();
 }
 
-// ══════════════════════════════════════════
-//  SAVE TO GAS (debounce 800ms)
-// ══════════════════════════════════════════
-function scheduleSyncToGAS() {
-  clearTimeout(syncTimer);
-  syncTimer = setTimeout(pushToGAS, 800);
-}
-
 async function pushToGAS() {
-  if (!GAS_URL) return;
+  if (!GAS_URL) { setSyncBadge('err', 'ยังไม่ได้ตั้งค่า URL'); return; }
   setSyncBadge('loading', 'กำลัง Sync...');
   try {
-    const CHUNK = 10;
-    for (let i = 0; i < jobs.length; i += CHUNK) {
-      const chunk = jobs.slice(i, i + CHUNK);
-      const isFirst = i === 0;
-      const data = await gasRequest(GAS_URL, {
-        action: 'saveChunk',
-        chunk: JSON.stringify(chunk),
-        reset: isFirst ? '1' : '0',
-        total: String(jobs.length)
-      });
-      if (!data.ok) throw new Error('chunk failed');
-    }
-    // ถ้า jobs ว่าง ส่ง reset เปล่าเพื่อล้าง Sheet
-    if (jobs.length === 0) {
-      await gasRequest(GAS_URL, { action: 'saveChunk', chunk: '[]', reset: '1', total: '0' });
-    }
-    setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
-  } catch (e) {
+    const data = await sheetsWrite(jobs);
+    if (data && data.ok) {
+      setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
+    } else throw new Error('not ok');
+  } catch(e) {
     setSyncBadge('err', 'Sync ไม่ได้ ข้อมูลเซฟในเครื่องแล้ว');
   }
 }
@@ -899,4 +840,18 @@ render();
 if (!jobs || jobs.length === 0) loadFromGAS();
 </script>
 </body>
-</html>
+</html>async function testConnection() {
+  const res = document.getElementById('gas-test-result');
+  res.textContent = '⏳ กำลังทดสอบ...';
+  res.style.color = '#92400e';
+  try {
+    const data = await sheetsRead();
+    res.textContent = '✅ เชื่อมต่อสำเร็จ! (' + data.length + ' รายการ)';
+    res.style.color = '#14532d';
+  } catch(e) {
+    res.textContent = '❌ เชื่อมต่อไม่ได้ — ' + e.message;
+    res.style.color = '#991b1b';
+  }
+}
+
+
