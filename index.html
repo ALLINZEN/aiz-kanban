@@ -393,18 +393,9 @@ function saveGasUrl() {
   document.getElementById('gas-test-result').textContent = '';
   // บันทึก URL แล้ว push ข้อมูลที่มีอยู่ขึ้น Sheet ทันที
   // ถ้าไม่มีข้อมูลเลยค่อยดึงจาก Sheet
-  setTimeout(() => {
-    const current = JSON.parse(localStorage.getItem('aiz_kanban_v3') || '[]');
-    if (current && current.length > 0) {
-      jobs = current;
-      render();
-      setSyncBadge('loading', 'กำลัง Sync ข้อมูลขึ้น Sheet...');
-      pushToGAS();
-    } else {
-      setSyncBadge('loading', 'กำลังโหลด...');
-      loadFromGAS();
-    }
-  }, 100);
+  // แค่บันทึก URL — ไม่โหลดหรือ push อะไรทั้งนั้น
+  // ให้ผู้ใช้กด Import backup เอง แล้วจะ push ขึ้นเอง
+  setSyncBadge('ok', 'บันทึก URL แล้ว — กรุณา Import backup');
 }
 
 async function gasRequest(url, params) {
@@ -797,8 +788,13 @@ function importBackup(e) {
       if (!Array.isArray(data)) throw new Error();
       if (!confirm(`กู้ข้อมูล ${data.length} รายการ?\n⚠ ข้อมูลปัจจุบันจะถูกแทนที่`)) return;
       jobs = data;
-      save(); render();
+      saveLocal(); render();
       closeModal('modal-backup');
+      // Push ขึ้น Sheet ทันทีหลัง import
+      if (GAS_URL) {
+        setSyncBadge('loading', 'กำลัง Sync ขึ้น Sheet...');
+        pushToGAS();
+      }
       alert('กู้ข้อมูลสำเร็จ ' + data.length + ' รายการ');
     } catch { alert('ไฟล์ไม่ถูกต้อง'); }
   };
