@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบติดตามงาน — All In Zen</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sarabun','Arial',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px}
+header{background:#fff;border-bottom:1px solid #e0e0e0;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:8px}
+header h1{font-size:16px;font-weight:600}
+.hbtns{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.topbar{background:#fff;border-bottom:1px solid #e8e8e8;padding:8px 20px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.topbar input,.topbar select{font-size:13px;padding:6px 10px;border:1px solid #ddd;border-radius:6px;outline:none;background:#fff}
+.topbar input:focus,.topbar select:focus{border-color:#378ADD}
+.btn{font-size:12px;padding:6px 12px;border-radius:6px;border:1px solid #ddd;background:#fff;cursor:pointer;font-family:inherit;color:#333;white-space:nowrap}
+.btn:hover{background:#f0f0f0}
+.btn-primary{background:#378ADD;color:#fff;border-color:#378ADD}
+.btn-primary:hover{background:#185FA5}
+.btn-green{background:#3B6D11;color:#fff;border-color:#3B6D11}
+.btn-green:hover{background:#27500A}
+.btn-amber{background:#854F0B;color:#fff;border-color:#854F0B}
+.btn-amber:hover{background:#633806}
+.btn-red{background:#A32D2D;color:#fff;border-color:#A32D2D}
+.btn-red:hover{background:#791F1F}
+.save-note{font-size:11px;color:#aaa;margin-left:4px}
+
+/* Sync status */
+.sync-badge{font-size:11px;padding:3px 9px;border-radius:99px;font-weight:500;display:inline-flex;align-items:center;gap:4px}
+.sync-ok{background:#dcfce7;color:#14532d}
+.sync-err{background:#fee2e2;color:#991b1b}
+.sync-loading{background:#fef3c7;color:#92400e}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* GAS Config banner */
+.gas-banner{background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 16px;margin:10px 20px;display:flex;align-items:center;gap:10px;font-size:12px;flex-wrap:wrap}
+.gas-banner input{flex:1;min-width:280px;font-size:12px;padding:5px 9px;border:1px solid #fbbf24;border-radius:5px;outline:none;font-family:inherit}
+.gas-banner input:focus{border-color:#f59e0b}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 20px}
+.stat{background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:10px 14px}
+.stat-n{font-size:22px;font-weight:600}
+.stat-l{font-size:11px;color:#888;margin-top:2px}
+.s1 .stat-n{color:#185FA5}.s2 .stat-n{color:#854F0B}.s3 .stat-n{color:#534AB7}.s4 .stat-n{color:#3B6D11}
+
+/* Billing ready counter */
+.stat-billing{background:#fff;border:2px solid #16a34a;border-radius:10px;padding:10px 14px}
+.stat-billing .stat-n{color:#16a34a;font-size:22px;font-weight:700}
+.stat-billing .stat-l{font-size:11px;color:#16a34a;margin-top:2px;font-weight:500}
+
+.stats-row2{display:grid;grid-template-columns:1fr 3fr;gap:10px;padding:0 20px 10px}
+
+.board{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:0 20px 20px}
+.col{background:#f0f0ee;border-radius:12px;padding:10px}
+.col-head{font-size:12px;font-weight:600;padding:7px 10px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.col-head .cnt{font-size:11px;font-weight:500;background:rgba(255,255,255,.7);border-radius:99px;padding:2px 8px}
+.h1{background:#dbeafe;color:#1e40af}.h2{background:#fef3c7;color:#92400e}.h3{background:#ede9fe;color:#4c1d95}.h4{background:#dcfce7;color:#14532d}
+.card{background:#fff;border:1px solid #e8e8e8;border-radius:8px;padding:10px 12px;margin-bottom:7px;cursor:pointer;transition:box-shadow .15s,border-color .15s}
+.card:hover{box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.card.dragging{opacity:.35}
+
+/* Billing ready highlight */
+.card.billing-ready{border:2px solid #16a34a;background:#f0fdf4}
+.card.billing-partial{border:2px solid #f59e0b;background:#fffbeb}
+
+.card-inv{font-size:13px;font-weight:600;margin-bottom:3px}
+.card-goods{font-size:12px;color:#555;margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-row{font-size:11px;color:#888;margin-bottom:2px}
+.card-row b{color:#444;font-weight:500}
+.card-btns{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.cbtn{font-size:11px;padding:3px 9px;border-radius:99px;border:1px solid #ddd;background:transparent;cursor:pointer;font-family:inherit;color:#555}
+.cbtn:hover{background:#f5f5f5}
+.cbtn-fwd{background:#dbeafe;color:#1e40af;border-color:#bfdbfe}
+.cbtn-del{color:#b91c1c;border-color:#fca5a5}
+.col-drop{background:#e0f2fe;border:2px dashed #38bdf8}
+.empty{text-align:center;padding:24px 10px;color:#bbb;font-size:12px}
+.tag-ship{display:inline-block;font-size:10px;padding:1px 6px;border-radius:99px;font-weight:500;margin-left:4px}
+.tag-air{background:#dbeafe;color:#1e40af}
+.tag-sea{background:#ccfbf1;color:#134e4a}
+.tag-land{background:#fef9c3;color:#713f12}
+
+/* Billing checklist in card */
+.billing-checks{border-top:1px solid #e8e8e8;margin-top:7px;padding-top:7px;display:flex;flex-direction:column;gap:4px}
+.bcheck{display:flex;align-items:center;gap:6px;font-size:11px;color:#555;cursor:pointer;user-select:none}
+.bcheck input[type=checkbox]{width:13px;height:13px;accent-color:#16a34a;cursor:pointer;flex-shrink:0}
+.bcheck.done{color:#16a34a;font-weight:500}
+.bcheck.done-warn{color:#f59e0b;font-weight:500}
+.billing-ready-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:99px;background:#dcfce7;color:#14532d;font-weight:600;margin-top:4px}
+
+.permit-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.permit-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:500}
+.permit-done{background:#dcfce7;color:#14532d}
+.permit-pending{background:#fef3c7;color:#92400e}
+.permit-section{border-top:1px solid #f0f0f0;margin-top:6px;padding-top:6px}
+.perm-group{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.perm-group label{font-size:12px;color:#555;display:flex;align-items:center;gap:5px;cursor:pointer;min-width:60px}
+.perm-group input[type=checkbox]{width:14px;height:14px;cursor:pointer;accent-color:#3B6D11}
+.perm-group input[type=text]{flex:1;font-size:12px;padding:4px 8px;border:1px solid #ddd;border-radius:5px;font-family:inherit;outline:none}
+.perm-group input[type=text]:focus{border-color:#378ADD}
+
+/* Modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:22px;width:500px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:15px;font-weight:600;margin-bottom:14px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:12px;color:#666;margin-bottom:4px;font-weight:500}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:7px 10px;border:1px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;outline:none}
+.form-group input:focus,.form-group select:focus{border-color:#378ADD}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+/* Backup modal */
+.backup-box{background:#f8f8f8;border:1px solid #ddd;border-radius:8px;padding:14px;margin-bottom:12px}
+.backup-box h3{font-size:13px;font-weight:600;margin-bottom:8px;color:#333}
+.backup-box p{font-size:12px;color:#666;margin-bottom:10px;line-height:1.6}
+
+/* Section divider */
+.section-label{font-size:11px;font-weight:600;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;padding-top:4px;border-top:1px solid #eee}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>ระบบติดตามงานนำเข้า — All In Zen</h1>
+    <span class="save-note" id="save-note"></span>
+  </div>
+  <div class="hbtns">
+    <span class="sync-badge sync-ok" id="sync-badge">✓ พร้อมใช้งาน</span>
+    <button class="btn btn-amber" onclick="openBackup()">💾 Backup / Restore</button>
+    <button class="btn btn-green" onclick="exportExcel()">⬇ Export Excel</button>
+    <button class="btn btn-primary" onclick="openAdd()">+ เพิ่มงาน</button>
+  </div>
+</header>
+
+<!-- GAS URL Config Banner -->
+<div class="gas-banner" id="gas-banner">
+  <span>🔗 <b>Google Sheet URL:</b></span>
+  <input type="text" id="gas-url-input" placeholder="วาง Web App URL จาก Google Apps Script ที่นี่...">
+  <button class="btn btn-primary" onclick="saveGasUrl()">บันทึก URL</button>
+  <button class="btn" onclick="testConnection()">ทดสอบ</button>
+  <span id="gas-test-result" style="font-size:11px;color:#888"></span>
+</div>
+
+<div class="topbar">
+  <input type="text" id="search" placeholder="ค้นหา Invoice / บริษัท / เลขใบขน..." style="width:260px" oninput="render()">
+  <select id="filter-port" onchange="render()">
+    <option value="">ท่าทั้งหมด</option>
+    <option value="แหลม">แหลมฉบัง</option>
+    <option value="อากาศ">ทางอากาศ</option>
+    <option value="กรุง">กรุงเทพ</option>
+    <option value="ลาด">ลาดกระบัง</option>
+  </select>
+  <select id="filter-billing" onchange="render()">
+    <option value="">ทุกสถานะบิล</option>
+    <option value="ready">✅ พร้อมออกบิลแล้ว</option>
+    <option value="partial">⏳ รอเอกสาร</option>
+  </select>
+</div>
+
+<div class="stats">
+  <div class="stat s1"><div class="stat-n" id="s1">0</div><div class="stat-l">รอเรือเข้า</div></div>
+  <div class="stat s2"><div class="stat-n" id="s2">0</div><div class="stat-l">เรือเข้าแล้ว รอเอกสาร</div></div>
+  <div class="stat s3"><div class="stat-n" id="s3">0</div><div class="stat-l">พร้อมเคลียร์</div></div>
+  <div class="stat s4"><div class="stat-n" id="s4">0</div><div class="stat-l">เสร็จแล้ว</div></div>
+</div>
+
+<!-- Billing ready summary -->
+<div class="stats-row2">
+  <div class="stat-billing">
+    <div class="stat-n" id="s-billing">0</div>
+    <div class="stat-l">✅ พร้อมออกใบแจ้งหนี้</div>
+  </div>
+  <div class="stat" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="font-size:12px;color:#555;line-height:1.8">
+      <b style="color:#333">เงื่อนไขพร้อมออกบิล:</b><br>
+      ☑ ชิปปิ้งส่งเอกสารแล้ว &nbsp;+&nbsp; ☑ ได้รับใบรถ / Lift On-Off แล้ว &nbsp;+&nbsp; ☑ เลข AIZ Invoice ครบ
+    </div>
+  </div>
+</div>
+
+<div class="board">
+  <div class="col" id="col-wait" ondragover="ev(event)" ondrop="drop(event,'wait')" ondragleave="lv(event)">
+    <div class="col-head h1">รอเรือเข้า <span class="cnt" id="cnt-wait">0</span></div>
+    <div id="list-wait"></div>
+  </div>
+  <div class="col" id="col-arrived" ondragover="ev(event)" ondrop="drop(event,'arrived')" ondragleave="lv(event)">
+    <div class="col-head h2">เรือเข้าแล้ว รอเอกสาร <span class="cnt" id="cnt-arrived">0</span></div>
+    <div id="list-arrived"></div>
+  </div>
+  <div class="col" id="col-ready" ondragover="ev(event)" ondrop="drop(event,'ready')" ondragleave="lv(event)">
+    <div class="col-head h3">พร้อมเคลียร์ <span class="cnt" id="cnt-ready">0</span></div>
+    <div id="list-ready"></div>
+  </div>
+  <div class="col" id="col-done" ondragover="ev(event)" ondrop="drop(event,'done')" ondragleave="lv(event)">
+    <div class="col-head h4">เสร็จแล้ว <span class="cnt" id="cnt-done">0</span></div>
+    <div id="list-done"></div>
+  </div>
+</div>
+
+<!-- Modal เพิ่ม/แก้ไข -->
+<div class="modal-bg" id="modal-form">
+  <div class="modal">
+    <h2 id="modal-title">เพิ่มงานใหม่</h2>
+    <div class="form-row">
+      <div class="form-group">
+        <label>เลข Invoice / PO *</label>
+        <input id="f-inv" placeholder="เช่น COP2025311-CI2">
+      </div>
+      <div class="form-group">
+        <label>ชื่อบริษัท</label>
+        <input id="f-company" placeholder="เช่น Croft Foods">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>ชื่อสินค้า</label>
+      <input id="f-goods" placeholder="เช่น Wet Wipes, White Quinoa">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>เลข MAWB / B/L</label>
+        <input id="f-mawb" placeholder="เลข MAWB หรือ B/L">
+      </div>
+      <div class="form-group">
+        <label>เลขใบขน</label>
+        <input id="f-declaration" placeholder="เช่น A0050690119919">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>วันที่เรือ/เครื่องเข้า (ETA)</label>
+        <input type="date" id="f-eta">
+      </div>
+      <div class="form-group">
+        <label>วันที่เคลียร์พิธีการ (วันปล่อย)</label>
+        <input type="date" id="f-cleardate">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>ท่า</label>
+        <select id="f-port">
+          <option value="แหลม">แหลมฉบัง</option>
+          <option value="อากาศ">ทางอากาศ</option>
+          <option value="กรุง">กรุงเทพ</option>
+          <option value="ลาด">ลาดกระบัง</option>
+          <option value="-">อื่นๆ</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>สถานะ</label>
+        <select id="f-status">
+          <option value="wait">รอเรือเข้า</option>
+          <option value="arrived">เรือเข้าแล้ว รอเอกสาร</option>
+          <option value="ready">พร้อมเคลียร์</option>
+          <option value="done">เสร็จแล้ว</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Shipping (ชื่อสายเรือ/สายการบิน)</label>
+        <input id="f-shipping" placeholder="เช่น EVERGREEN, AIR FRANCE">
+      </div>
+      <div class="form-group">
+        <label>เลข JOB</label>
+        <input id="f-job" placeholder="เช่น JOB-2026-001">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>ใบแจ้งหนี้ (AIZ)</label>
+      <input id="f-invoice" placeholder="เช่น AIZ-690061">
+    </div>
+
+    <!-- Billing Checklist Section -->
+    <div class="form-group">
+      <div class="section-label">✅ Checklist การวางบิล</div>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="f-bill-shipping" style="width:15px;height:15px;accent-color:#16a34a">
+          <span>📄 ชิปปิ้งส่งเอกสารปิดบัญชีแล้ว</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="f-bill-truck" style="width:15px;height:15px;accent-color:#16a34a">
+          <span>🚛 ได้รับใบรถ / ค่า Lift On-Off แล้ว</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="f-bill-ready" style="width:15px;height:15px;accent-color:#16a34a">
+          <span>🧾 พร้อมออกใบแจ้งหนี้ (AIZ ครบแล้ว)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>ยื่นขออนุญาต (ติ๊กถ้ายื่นแล้ว)</label>
+      <div style="background:#f8f8f8;border:1px solid #eee;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:2px">
+        <div class="perm-group">
+          <label><input type="checkbox" id="f-perm-lpi"> LPI</label>
+          <input type="text" id="f-perm-lpi-remark" placeholder="remark LPI...">
+        </div>
+        <div class="perm-group">
+          <label><input type="checkbox" id="f-perm-doa"> DOA</label>
+          <input type="text" id="f-perm-doa-remark" placeholder="remark DOA...">
+        </div>
+        <div class="perm-group">
+          <label><input type="checkbox" id="f-perm-etc"> <input type="text" id="f-perm-etc-name" placeholder="อื่นๆ..." style="width:70px;font-size:12px;padding:2px 6px;border:1px solid #ddd;border-radius:4px"></label>
+          <input type="text" id="f-perm-etc-remark" placeholder="remark...">
+        </div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>สถานะดำเนินการ</label>
+      <div style="background:#f8f8f8;border:1px solid #eee;border-radius:8px;padding:10px;display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="f-delivered" style="width:15px;height:15px;accent-color:#3B6D11">
+          ส่งสินค้าแล้ว
+        </label>
+        <input type="date" id="f-deliverdate" style="font-size:13px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;outline:none" title="วันที่ส่งสินค้า">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="f-taxpaid" style="width:15px;height:15px;accent-color:#185FA5">
+          โอนภาษีแล้ว
+        </label>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>ส่ง & วันส่ง / หมายเหตุ</label>
+      <textarea id="f-note" rows="2" placeholder="เช่น รับเอง.7.1.2026  หรือ รอ B/L ต้นฉบับ"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-form')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveCard()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Backup -->
+<div class="modal-bg" id="modal-backup">
+  <div class="modal">
+    <h2>💾 Backup & Restore ข้อมูล</h2>
+    <div class="backup-box">
+      <h3>⬇ Export Backup (บันทึกข้อมูลลงเครื่อง)</h3>
+      <p>ดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ <b>.json</b> เก็บไว้ที่เครื่องหรือ Google Drive<br>แนะนำทำทุกสัปดาห์หรือก่อนล้าง cache</p>
+      <button class="btn btn-green" onclick="exportBackup()">⬇ ดาวน์โหลด Backup (.json)</button>
+    </div>
+    <div class="backup-box">
+      <h3>⬆ Import Restore (กู้ข้อมูลคืน)</h3>
+      <p>เลือกไฟล์ <b>.json</b> ที่เคย backup ไว้<br><span style="color:#b91c1c;font-weight:500">⚠ ข้อมูลปัจจุบันจะถูกแทนที่ทั้งหมด</span></p>
+      <input type="file" id="restore-file" accept=".json" onchange="importBackup(event)" style="font-size:13px">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-backup')">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  CONFIG — ใส่ Web App URL ตรงนี้
+// ══════════════════════════════════════════
+const GAS_URL_KEY = 'aiz_gas_url';
+let GAS_URL = localStorage.getItem(GAS_URL_KEY) || '';
+
+// ══════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════
+const KEY = 'aiz_kanban_v3';
+let jobs = [], editId = null, dragId = null;
+let syncPending = false, syncTimer = null;
+
+// ══════════════════════════════════════════
+//  GAS URL CONFIG
+// ══════════════════════════════════════════
+function initGasBanner() {
+  const input = document.getElementById('gas-url-input');
+  input.value = GAS_URL;
+  if (GAS_URL) {
+    document.getElementById('gas-banner').style.background = '#f0fdf4';
+    document.getElementById('gas-banner').style.borderColor = '#bbf7d0';
+  }
+}
+
+function saveGasUrl() {
+  const val = document.getElementById('gas-url-input').value.trim();
+  if (!val) { alert('กรุณาใส่ URL'); return; }
+  GAS_URL = val;
+  localStorage.setItem(GAS_URL_KEY, GAS_URL);
+  document.getElementById('gas-banner').style.background = '#f0fdf4';
+  document.getElementById('gas-banner').style.borderColor = '#bbf7d0';
+  document.getElementById('gas-test-result').textContent = '';
+  // บันทึก URL แล้ว push ข้อมูลที่มีอยู่ขึ้น Sheet ทันที
+  // ถ้าไม่มีข้อมูลเลยค่อยดึงจาก Sheet
+  setTimeout(() => {
+    const current = JSON.parse(localStorage.getItem('aiz_kanban_v3') || '[]');
+    if (current && current.length > 0) {
+      jobs = current;
+      render();
+      setSyncBadge('loading', 'กำลัง Sync ข้อมูลขึ้น Sheet...');
+      pushToGAS();
+    } else {
+      setSyncBadge('loading', 'กำลังโหลด...');
+      loadFromGAS();
+    }
+  }, 100);
+}
+
+async function gasRequest(url, params) {
+  const qs = Object.entries(params).map(([k,v]) => k + '=' + encodeURIComponent(v)).join('&');
+  const r = await fetch(url + '?' + qs);
+  return await r.json();
+}
+
+async function testConnection() {
+  const url = document.getElementById('gas-url-input').value.trim();
+  if (!url) { alert('ใส่ URL ก่อนทดสอบ'); return; }
+  const res = document.getElementById('gas-test-result');
+  res.textContent = '⏳ กำลังทดสอบ...';
+  res.style.color = '#92400e';
+  try {
+    const data = await gasRequest(url, { action: 'getAll' });
+    if (Array.isArray(data)) {
+      res.textContent = '✅ เชื่อมต่อสำเร็จ! (' + data.length + ' รายการ)';
+      res.style.color = '#14532d';
+    } else {
+      res.textContent = '⚠ ตอบกลับแต่ format ไม่ถูกต้อง';
+      res.style.color = '#b45309';
+    }
+  } catch (e) {
+    res.textContent = '❌ เชื่อมต่อไม่ได้ — ตรวจสอบ URL และ Deploy อีกครั้ง';
+    res.style.color = '#991b1b';
+  }
+}
+
+// ══════════════════════════════════════════
+//  SYNC BADGE
+// ══════════════════════════════════════════
+function setSyncBadge(state, text) {
+  const el = document.getElementById('sync-badge');
+  el.className = 'sync-badge sync-' + state;
+  el.innerHTML = state === 'loading'
+    ? '<span class="sync-dot"></span>' + text
+    : (state === 'ok' ? '✓ ' : '⚠ ') + text;
+}
+
+// ══════════════════════════════════════════
+//  LOAD FROM GAS
+// ══════════════════════════════════════════
+async function loadFromGAS() {
+  if (!GAS_URL) {
+    loadLocal();
+    setSyncBadge('err', 'ยังไม่ได้ตั้งค่า URL');
+    render();
+    return;
+  }
+  setSyncBadge('loading', 'กำลังโหลด...');
+  try {
+    const data = await gasRequest(GAS_URL, { action: 'getAll' });
+    if (Array.isArray(data)) {
+      // ถ้า Sheet ว่างแต่เครื่องมีข้อมูล ไม่ทับ
+      if (data.length === 0 && jobs.length > 0) {
+        setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
+      } else {
+        jobs = data;
+        saveLocal();
+        setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
+      }
+    } else throw new Error('bad response');
+  } catch (e) {
+    loadLocal();
+    setSyncBadge('err', 'โหลดไม่ได้ ใช้ข้อมูลเครื่องแทน');
+  }
+  render();
+}
+
+// ══════════════════════════════════════════
+//  SAVE TO GAS (debounce 800ms)
+// ══════════════════════════════════════════
+function scheduleSyncToGAS() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushToGAS, 800);
+}
+
+async function pushToGAS() {
+  if (!GAS_URL) return;
+  setSyncBadge('loading', 'กำลัง Sync...');
+  try {
+    const r = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'saveAll', jobs })
+    });
+    const data = await r.json();
+    if (data && data.ok) {
+      setSyncBadge('ok', 'Sync แล้ว ' + fmtTime());
+    } else throw new Error('not ok');
+  } catch (e) {
+    setSyncBadge('err', 'Sync ไม่ได้ ข้อมูลเซฟในเครื่องแล้ว');
+  }
+}
+
+function fmtTime() {
+  return new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ══════════════════════════════════════════
+//  LOCAL STORAGE (fallback)
+// ══════════════════════════════════════════
+function loadLocal() {
+  try { jobs = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { jobs = []; }
+  if (!jobs.length) jobs = getSampleData();
+}
+
+function saveLocal() {
+  localStorage.setItem(KEY, JSON.stringify(jobs));
+  document.getElementById('save-note').textContent = 'บันทึก ' + fmtTime();
+}
+
+function save() {
+  saveLocal();
+  scheduleSyncToGAS();
+}
+
+function getSampleData() {
+  return [
+    { id: 1, inv: 'COP2025311-CI2', company: 'ครอฟท์ ฟู้ดส์', goods: 'Wet Wipes', mawb: 'HASLS21251200912', declaration: 'A0050690119919', eta: '2026-04-28', cleardate: '', port: 'แหลม', status: 'wait', invoice: '', shipping: '', job: '', note: '', billShipping: false, billTruck: false, billReady: false, delivered: false, deliverdate: '', taxpaid: false, permits: [] },
+    { id: 2, inv: 'OTGE-20253295', company: 'ครอฟท์ ฟู้ดส์', goods: 'White Quinoa', mawb: 'PUSJ549030', declaration: 'A0060690113422', eta: '2026-04-29', cleardate: '', port: 'แหลม', status: 'arrived', invoice: 'AIZ-690043', shipping: '', job: '', note: 'รอ B/L ต้นฉบับ', billShipping: true, billTruck: false, billReady: false, delivered: false, deliverdate: '', taxpaid: false, permits: [] },
+    { id: 3, inv: '19164/2026', company: 'T-HA', goods: 'สินค้าทางอากาศ', mawb: '11901449254/2957826115', declaration: 'A0060690111067', eta: '2026-04-27', cleardate: '2026-04-28', port: 'อากาศ', status: 'done', invoice: 'AIZ-690070', shipping: 'AIR FRANCE', job: '', note: 'AIZ8.1.2026', billShipping: true, billTruck: true, billReady: true, delivered: true, deliverdate: '2026-04-30', taxpaid: true, permits: [] },
+  ];
+}
+
+// ══════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════
+const portTag = p => {
+  if (p === 'อากาศ') return '<span class="tag-ship tag-air">✈ แอร์</span>';
+  if (p === 'แหลม') return '<span class="tag-ship tag-sea">⚓ แหลม</span>';
+  if (p === 'กรุง') return '<span class="tag-ship tag-sea">⚓ กรุงเทพ</span>';
+  if (p === 'ลาด') return '<span class="tag-ship tag-land">🚛 ลาด</span>';
+  return '<span class="tag-ship tag-land">— ' + p + '</span>';
+};
+
+function isBillingReady(j) {
+  return j.billShipping && j.billTruck && j.billReady;
+}
+function isBillingPartial(j) {
+  return (j.billShipping || j.billTruck || j.billReady) && !isBillingReady(j);
+}
+
+function render() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const fp = document.getElementById('filter-port').value;
+  const fb = document.getElementById('filter-billing').value;
+  const cols = ['wait', 'arrived', 'ready', 'done'];
+  const next = { wait: 'arrived', arrived: 'ready', ready: 'done' };
+  const nextLabel = { wait: 'เรือเข้าแล้ว →', arrived: 'พร้อมเคลียร์ →', ready: 'เสร็จแล้ว ✓' };
+
+  let billingReadyCount = 0;
+
+  cols.forEach((c, ci) => {
+    let filtered = jobs.filter(j => {
+      if (j.status !== c) return false;
+      if (fp && j.port !== fp) return false;
+      if (q) {
+        const hay = [j.inv, j.company, j.goods, j.declaration, j.mawb, j.note, j.invoice].join(' ').toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (fb === 'ready' && !isBillingReady(j)) return false;
+      if (fb === 'partial' && !isBillingPartial(j)) return false;
+      return true;
+    });
+
+    document.getElementById('cnt-' + c).textContent = filtered.length;
+    document.getElementById('s' + (ci + 1)).textContent = filtered.length;
+
+    // Count billing ready across all statuses
+    if (c === 'done' || c === 'ready') {
+      filtered.forEach(j => { if (isBillingReady(j)) billingReadyCount++; });
+    }
+
+    document.getElementById('list-' + c).innerHTML = filtered.length ? filtered.map(j => {
+      const br = isBillingReady(j);
+      const bp = isBillingPartial(j);
+      const cardClass = br ? 'card billing-ready' : (bp ? 'card billing-partial' : 'card');
+      const checks = j.billShipping || j.billTruck || j.billReady ? `
+        <div class="billing-checks">
+          <label class="bcheck ${j.billShipping ? 'done' : ''}" onclick="toggleBillCheck(event,${j.id},'billShipping')">
+            <input type="checkbox" ${j.billShipping ? 'checked' : ''} onclick="toggleBillCheck(event,${j.id},'billShipping')"> 📄 ชิปปิ้งส่งเอกสารแล้ว
+          </label>
+          <label class="bcheck ${j.billTruck ? 'done' : ''}" onclick="toggleBillCheck(event,${j.id},'billTruck')">
+            <input type="checkbox" ${j.billTruck ? 'checked' : ''} onclick="toggleBillCheck(event,${j.id},'billTruck')"> 🚛 ได้รับใบรถ / Lift On-Off แล้ว
+          </label>
+          <label class="bcheck ${j.billReady ? 'done' : ''}" onclick="toggleBillCheck(event,${j.id},'billReady')">
+            <input type="checkbox" ${j.billReady ? 'checked' : ''} onclick="toggleBillCheck(event,${j.id},'billReady')"> 🧾 พร้อมออกใบแจ้งหนี้
+          </label>
+          ${br ? '<div class="billing-ready-badge">✅ พร้อมออกบิลแล้ว!</div>' : ''}
+        </div>` : `
+        <div style="margin-top:6px">
+          <button class="cbtn" style="font-size:10px;color:#16a34a;border-color:#bbf7d0" onclick="openBillChecks(event,${j.id})">+ เปิด checklist วางบิล</button>
+        </div>`;
+
+      return `
+      <div class="${cardClass}" draggable="true" id="card-${j.id}" ondragstart="ds(event,${j.id})" ondragend="de()">
+        <div class="card-inv">${j.inv}${portTag(j.port)}</div>
+        <div class="card-goods">${j.company}${j.goods ? ' · ' + j.goods : ''}</div>
+        ${j.mawb ? `<div class="card-row"><b>MAWB/B/L:</b> ${j.mawb}</div>` : ''}
+        ${j.shipping ? `<div class="card-row"><b>Shipping:</b> ${j.shipping}${j.job ? ' &nbsp;|&nbsp; <b>JOB:</b> ' + j.job : ''}</div>` : (j.job ? `<div class="card-row"><b>JOB:</b> ${j.job}</div>` : '')}
+        ${j.declaration ? `<div class="card-row"><b>ใบขน:</b> ${j.declaration}</div>` : ''}
+        ${j.eta ? `<div class="card-row"><b>ETA:</b> ${j.eta}</div>` : ''}
+        ${j.cleardate ? `<div class="card-row"><b>วันปล่อย:</b> ${j.cleardate}</div>` : ''}
+        ${j.invoice ? `<div class="card-row"><b>AIZ:</b> ${j.invoice}</div>` : ''}
+        ${(j.delivered || j.taxpaid) ? `<div class="card-row" style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap">
+          ${j.delivered ? `<span class="permit-tag permit-done">✓ ส่งสินค้าแล้ว${j.deliverdate ? ' · ' + j.deliverdate : ''}</span>` : ''}
+          ${j.taxpaid ? '<span class="permit-tag" style="background:#dbeafe;color:#1e40af">✓ โอนภาษีแล้ว</span>' : ''}
+        </div>` : ''}
+        ${j.note ? `<div class="card-row" style="color:#888;font-style:italic">${j.note}</div>` : ''}
+        ${(j.permits && j.permits.some(p => p.checked || p.name)) ? `
+        <div class="permit-section">
+          <div class="permit-row">
+            ${j.permits.filter(p => p.checked).map(p => `<span class="permit-tag permit-done">✓ ${p.name}${p.remark ? ' · ' + p.remark : ''}</span>`).join('')}
+            ${j.permits.filter(p => !p.checked && p.name).map(p => `<span class="permit-tag permit-pending">⏳ ${p.name}${p.remark ? ' · ' + p.remark : ''}</span>`).join('')}
+          </div>
+        </div>` : ''}
+        ${checks}
+        <div class="card-btns">
+          <button class="cbtn" onclick="openEdit(${j.id})">แก้ไข</button>
+          ${next[c] ? `<button class="cbtn cbtn-fwd" onclick="moveNext(${j.id},'${next[c]}')">${nextLabel[c]}</button>` : ''}
+          <button class="cbtn cbtn-del" onclick="delJob(${j.id})">ลบ</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty">ไม่มีงาน</div>';
+  });
+
+  // Count billing ready for all jobs (not just filtered)
+  const totalBillingReady = jobs.filter(isBillingReady).length;
+  document.getElementById('s-billing').textContent = totalBillingReady;
+}
+
+// ══════════════════════════════════════════
+//  BILLING CHECKLIST QUICK TOGGLE
+// ══════════════════════════════════════════
+function toggleBillCheck(e, id, field) {
+  e.stopPropagation();
+  const j = jobs.find(x => x.id === id);
+  if (!j) return;
+  j[field] = !j[field];
+  save(); render();
+}
+
+function openBillChecks(e, id) {
+  e.stopPropagation();
+  const j = jobs.find(x => x.id === id);
+  if (!j) return;
+  j.billShipping = false; j.billTruck = false; j.billReady = false;
+  save(); render();
+}
+
+// ══════════════════════════════════════════
+//  MODAL
+// ══════════════════════════════════════════
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function saveCard() {
+  const inv = document.getElementById('f-inv').value.trim();
+  if (!inv) { alert('กรุณาใส่เลข Invoice'); return; }
+  const etcName = document.getElementById('f-perm-etc-name').value.trim();
+  const permits = [
+    { id: 'lpi', name: 'LPI', checked: document.getElementById('f-perm-lpi').checked, remark: document.getElementById('f-perm-lpi-remark').value.trim() },
+    { id: 'doa', name: 'DOA', checked: document.getElementById('f-perm-doa').checked, remark: document.getElementById('f-perm-doa-remark').value.trim() },
+    { id: 'etc', name: etcName, checked: document.getElementById('f-perm-etc').checked, remark: document.getElementById('f-perm-etc-remark').value.trim() },
+  ].filter(p => p.checked || p.name);
+  const data = {
+    inv, permits,
+    company: document.getElementById('f-company').value.trim(),
+    goods: document.getElementById('f-goods').value.trim(),
+    mawb: document.getElementById('f-mawb').value.trim(),
+    declaration: document.getElementById('f-declaration').value.trim(),
+    eta: document.getElementById('f-eta').value,
+    cleardate: document.getElementById('f-cleardate').value,
+    port: document.getElementById('f-port').value,
+    status: document.getElementById('f-status').value,
+    shipping: document.getElementById('f-shipping').value.trim(),
+    job: document.getElementById('f-job').value.trim(),
+    invoice: document.getElementById('f-invoice').value.trim(),
+    delivered: document.getElementById('f-delivered').checked,
+    deliverdate: document.getElementById('f-deliverdate').value,
+    taxpaid: document.getElementById('f-taxpaid').checked,
+    note: document.getElementById('f-note').value.trim(),
+    billShipping: document.getElementById('f-bill-shipping').checked,
+    billTruck: document.getElementById('f-bill-truck').checked,
+    billReady: document.getElementById('f-bill-ready').checked,
+  };
+  if (editId) {
+    const i = jobs.findIndex(x => x.id === editId);
+    if (i >= 0) jobs[i] = { ...jobs[i], ...data };
+  } else {
+    jobs.unshift({ id: Date.now(), ...data });
+  }
+  save(); render(); closeModal('modal-form');
+}
+
+function moveNext(id, status) {
+  const j = jobs.find(x => x.id === id);
+  if (j) { j.status = status; save(); render(); }
+}
+
+function delJob(id) {
+  if (!confirm('ลบงานนี้?')) return;
+  jobs = jobs.filter(x => x.id !== id);
+  save(); render();
+}
+
+function openAdd() {
+  editId = null;
+  document.getElementById('modal-title').textContent = 'เพิ่มงานใหม่';
+  ['inv','company','goods','mawb','declaration','eta','cleardate','invoice','note','shipping','job'].forEach(f => {
+    const el = document.getElementById('f-' + f);
+    if (el) el.value = '';
+  });
+  document.getElementById('f-port').value = 'แหลม';
+  document.getElementById('f-status').value = 'wait';
+  document.getElementById('f-delivered').checked = false;
+  document.getElementById('f-deliverdate').value = '';
+  document.getElementById('f-taxpaid').checked = false;
+  document.getElementById('f-bill-shipping').checked = false;
+  document.getElementById('f-bill-truck').checked = false;
+  document.getElementById('f-bill-ready').checked = false;
+  ['f-perm-lpi','f-perm-doa','f-perm-etc'].forEach(id => document.getElementById(id).checked = false);
+  ['f-perm-lpi-remark','f-perm-doa-remark','f-perm-etc-remark','f-perm-etc-name'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('modal-form').classList.add('open');
+}
+
+function openEdit(id) {
+  const j = jobs.find(x => x.id === id);
+  if (!j) return;
+  editId = id;
+  document.getElementById('modal-title').textContent = 'แก้ไขงาน';
+  ['inv','company','goods','mawb','declaration','eta','cleardate','invoice','note','shipping','job'].forEach(f => {
+    const el = document.getElementById('f-' + f);
+    if (el) el.value = j[f] || '';
+  });
+  document.getElementById('f-port').value = j.port || 'แหลม';
+  document.getElementById('f-status').value = j.status || 'wait';
+  document.getElementById('f-delivered').checked = !!j.delivered;
+  document.getElementById('f-deliverdate').value = j.deliverdate || '';
+  document.getElementById('f-taxpaid').checked = !!j.taxpaid;
+  document.getElementById('f-bill-shipping').checked = !!j.billShipping;
+  document.getElementById('f-bill-truck').checked = !!j.billTruck;
+  document.getElementById('f-bill-ready').checked = !!j.billReady;
+  const perms = j.permits || [];
+  const lpi = perms.find(p => p.id === 'lpi') || {};
+  const doa = perms.find(p => p.id === 'doa') || {};
+  const etc = perms.find(p => p.id === 'etc') || {};
+  document.getElementById('f-perm-lpi').checked = !!lpi.checked;
+  document.getElementById('f-perm-lpi-remark').value = lpi.remark || '';
+  document.getElementById('f-perm-doa').checked = !!doa.checked;
+  document.getElementById('f-perm-doa-remark').value = doa.remark || '';
+  document.getElementById('f-perm-etc').checked = !!etc.checked;
+  document.getElementById('f-perm-etc-name').value = etc.name || '';
+  document.getElementById('f-perm-etc-remark').value = etc.remark || '';
+  document.getElementById('modal-form').classList.add('open');
+}
+
+// ══════════════════════════════════════════
+//  BACKUP / RESTORE
+// ══════════════════════════════════════════
+function openBackup() { document.getElementById('modal-backup').classList.add('open'); }
+
+function exportBackup() {
+  const data = JSON.stringify(jobs, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `aiz_kanban_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function importBackup(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) throw new Error();
+      if (!confirm(`กู้ข้อมูล ${data.length} รายการ?\n⚠ ข้อมูลปัจจุบันจะถูกแทนที่`)) return;
+      jobs = data;
+      save(); render();
+      closeModal('modal-backup');
+      alert('กู้ข้อมูลสำเร็จ ' + data.length + ' รายการ');
+    } catch { alert('ไฟล์ไม่ถูกต้อง'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// ══════════════════════════════════════════
+//  EXPORT EXCEL
+// ══════════════════════════════════════════
+function exportExcel() {
+  const done = jobs.filter(j => j.status === 'done');
+  if (!done.length) { alert('ยังไม่มีงานที่เสร็จแล้ว'); return; }
+  const wb = XLSX.utils.book_new();
+  const byMonth = {};
+  done.forEach(j => {
+    const d = j.cleardate || j.eta || '';
+    let key = 'ไม่ระบุ';
+    if (d) {
+      const dt = new Date(d);
+      const thMonths = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+      key = thMonths[dt.getMonth()] + (dt.getFullYear() + 543).toString().slice(-2);
+    }
+    if (!byMonth[key]) byMonth[key] = [];
+    byMonth[key].push(j);
+  });
+  Object.entries(byMonth).forEach(([month, items]) => {
+    const ws = XLSX.utils.aoa_to_sheet([]);
+    XLSX.utils.sheet_add_aoa(ws, [[`เดือน ${month}  กอง 1.1`]], { origin: 'A1' });
+    const headers = ['', 'ท่า', 'ชื่อบริษัท', 'เลขMAWB', 'เลขINV', 'เลขใบขน', 'วันปล่อย', 'ใบแจ้งหนี้', 'วันออกบิล', 'ชิปปิ้ง✓', 'ใบรถ✓', 'พร้อมบิล✓', 'ส่ง&วันส่ง'];
+    XLSX.utils.sheet_add_aoa(ws, [headers], { origin: 'A2' });
+    items.forEach((j, i) => {
+      const portMap = { แหลม: 'แหลม', อากาศ: 'แอร์', กรุง: 'กรุง', ลาด: 'ลาด', '-': '-' };
+      const row = [i+1, portMap[j.port]||j.port, j.company, j.mawb, j.inv, j.declaration, j.cleardate||j.eta||'', j.invoice, '', j.billShipping?'✓':'', j.billTruck?'✓':'', j.billReady?'✓':'', j.note];
+      XLSX.utils.sheet_add_aoa(ws, [row], { origin: `A${i+3}` });
+    });
+    ws['!cols'] = [{wch:4},{wch:6},{wch:16},{wch:22},{wch:14},{wch:15},{wch:9},{wch:11},{wch:9},{wch:8},{wch:8},{wch:8},{wch:17}];
+    XLSX.utils.book_append_sheet(wb, ws, month);
+  });
+  XLSX.writeFile(wb, `ใบขนเสร็จแล้ว_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+// ══════════════════════════════════════════
+//  DRAG & DROP
+// ══════════════════════════════════════════
+function ds(e, id) { dragId = id; document.getElementById('card-'+id)?.classList.add('dragging'); }
+function de() { document.querySelectorAll('.card').forEach(c => c.classList.remove('dragging')); dragId = null; }
+function ev(e) { e.preventDefault(); e.currentTarget.classList.add('col-drop'); }
+function lv(e) { if (!e.currentTarget.contains(e.relatedTarget)) e.currentTarget.classList.remove('col-drop'); }
+function drop(e, status) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('col-drop');
+  if (!dragId) return;
+  const j = jobs.find(x => x.id === dragId);
+  if (j) { j.status = status; save(); render(); }
+  dragId = null;
+}
+
+['modal-form','modal-backup'].forEach(id => {
+  document.getElementById(id).addEventListener('click', e => {
+    if (e.target === document.getElementById(id)) closeModal(id);
+  });
+});
+
+// ══════════════════════════════════════════
+//  AUTO REFRESH จาก GAS ทุก 60 วินาที
+// ══════════════════════════════════════════
+// auto-refresh ปิดไว้ เพื่อป้องกันข้อมูลถูกทับ
+// setInterval(() => { if (GAS_URL) loadFromGAS(); }, 60000);
+
+// ══════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════
+initGasBanner();
+// โหลดจาก localStorage ก่อน ถ้ามีข้อมูลอยู่แล้วไม่ดึงจาก Sheet ทับ
+loadLocal();
+render();
+// ถ้าไม่มีข้อมูลในเครื่องเลย ค่อยดึงจาก Sheet
+if (!jobs || jobs.length === 0) loadFromGAS();
+</script>
+</body>
+</html>
